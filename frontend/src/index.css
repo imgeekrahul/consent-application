@@ -1,0 +1,53 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --color-brand-50: #eef5ff;
+  --color-brand-100: #d9e8ff;
+  --color-brand-200: #bcd7ff;
+  --color-brand-300: #8ebdff;
+  --color-brand-400: #5998ff;
+  --color-brand-500: #3374f5;
+  --color-brand-600: #1565d8;
+  --color-brand-700: #1050b0;
+  --color-brand-800: #13448f;
+  --color-brand-900: #163b74;
+  --shadow-page: 0 1px 2px rgb(15 23 42 / 0.06), 0 4px 16px rgb(15 23 42 / 0.08);
+}
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body {
+    @apply bg-slate-50 text-slate-800 antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:not(:disabled), [role='button']:not([aria-disabled='true']) { cursor: pointer; }
+}
+
+@utility btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
+      disabled:cursor-not-allowed disabled:opacity-50;
+  }
+@utility btn-primary { @apply btn bg-brand-600 text-white shadow-sm hover:bg-brand-700 active:bg-brand-800; }
+@utility btn-secondary { @apply btn border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-50 active:bg-slate-100; }
+@utility btn-ghost { @apply btn text-slate-600 hover:bg-slate-100 hover:text-slate-900; }
+@utility btn-danger { @apply btn bg-red-600 text-white shadow-sm hover:bg-red-700; }
+@utility btn-icon {
+    @apply inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100
+      hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500
+      disabled:cursor-not-allowed disabled:opacity-40;
+  }
+@utility input {
+    @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm
+      placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20;
+  }
+@utility card { @apply rounded-xl border border-slate-200 bg-white shadow-sm; }
+@utility label { @apply mb-1.5 block text-sm font-medium text-slate-700; }
+
+@keyframes fade-in { from { opacity: 0 } to { opacity: 1 } }
+@keyframes pop-in { from { opacity: 0; transform: translateY(8px) scale(.98) } to { opacity: 1; transform: none } }
+@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgb(245 158 11 / .45) } 70% { box-shadow: 0 0 0 10px rgb(245 158 11 / 0) } 100% { box-shadow: 0 0 0 0 rgb(245 158 11 / 0) } }
+.animate-fade-in { animation: fade-in .15s ease-out }
+.animate-pop-in { animation: pop-in .2s ease-out }
+.animate-pulse-ring { animation: pulse-ring 2s infinite }

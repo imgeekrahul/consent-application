@@ -1,0 +1,148 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: 22
+
+jobs:
+  test:
+    name: Build & E2E (${{ matrix.storage }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        storage: [file, mongodb]
+    services:
+      mongo:
+        image: mongo:7
+        ports: ['27017:27017']
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PORT: 5050
+      NODE_ENV: development
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: ci-admin-password-123
+      JWT_SECRET: ci-only-secret-0123456789abcdef0123456789abcdef
+      MONGODB_URI: ${{ matrix.storage == 'mongodb' && 'mongodb://127.0.0.1:27017/signdesk-ci' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Install backend
+        run: npm ci
+        working-directory: backend
+
+      - name: Install frontend
+        run: npm ci
+        working-directory: frontend
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: frontend
+
+      - name: Start API
+        working-directory: backend
+        run: |
+          node server.js > server.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -fs http://localhost:5050/api/health && exit 0
+            sleep 1
+          done
+          echo "API did not start"; cat server.log; exit 1
+
+      - name: End-to-end API tests
+        run: npm run test:e2e
+        working-directory: backend
+        env:
+          E2E_ADMIN_PASSWORD: ${{ env.ADMIN_PASSWORD }}
+
+      - name: Server log
+        if: always()
+        run: cat backend/server.log || true
+
+  deploy:
+    name: Deploy to Vercel
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://signdesk-app.vercel.app
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      # IDs are not secret; repository variables override these defaults.
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID || 'team_mmGSiGKhv2EosYLNEHwjr4kM' }}
+      BACKEND_PROJECT_ID: ${{ vars.VERCEL_BACKEND_PROJECT_ID || 'prj_3ViwqNGL9Hj8JZeIAYvTHbISYs9g' }}
+      FRONTEND_PROJECT_ID: ${{ vars.VERCEL_FRONTEND_PROJECT_ID || 'prj_Wdhox52PVjA7Kup66CRke1oA1WHx' }}
+    steps:
+      - name: Check Vercel token
+        id: check
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::warning::Repository secret VERCEL_TOKEN is not set — skipping deployment."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.ready == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.ready == 'true'
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Vercel CLI
+        if: steps.check.outputs.ready == 'true'
+        run: npm install --global vercel@latest
+
+      - name: Deploy backend (signdesk-api)
+        if: steps.check.outputs.ready == 'true'
+        working-directory: backend
+        env:
+          VERCEL_PROJECT_ID: ${{ env.BACKEND_PROJECT_ID }}
+        run: |
+          vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+          vercel build --prod --token="$VERCEL_TOKEN"
+          vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+
+      - name: Deploy frontend (signdesk-app)
+        if: steps.check.outputs.ready == 'true'
+        working-directory: frontend
+        env:
+          VERCEL_PROJECT_ID: ${{ env.FRONTEND_PROJECT_ID }}
+        run: |
+          vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+          vercel build --prod --token="$VERCEL_TOKEN"
+          vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+
+      - name: Smoke test
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          for i in $(seq 1 10); do
+            curl -fs https://signdesk-app.vercel.app/api/health && curl -fs -o /dev/null https://signdesk-app.vercel.app/admin/login && exit 0
+            sleep 5
+          done
+          echo "::error::Smoke test failed"; exit 1
