@@ -84,7 +84,7 @@ jobs:
   deploy:
     name: Deploy to Vercel
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: production
@@ -120,23 +120,15 @@ jobs:
 
       - name: Deploy backend (signdesk-api)
         if: steps.check.outputs.ready == 'true'
-        working-directory: backend
         env:
           VERCEL_PROJECT_ID: ${{ env.BACKEND_PROJECT_ID }}
-        run: |
-          vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
-          vercel build --prod --token="$VERCEL_TOKEN"
-          vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+        run: .github/scripts/vercel-deploy.sh backend signdesk-api
 
       - name: Deploy frontend (signdesk-app)
         if: steps.check.outputs.ready == 'true'
-        working-directory: frontend
         env:
           VERCEL_PROJECT_ID: ${{ env.FRONTEND_PROJECT_ID }}
-        run: |
-          vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
-          vercel build --prod --token="$VERCEL_TOKEN"
-          vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+        run: .github/scripts/vercel-deploy.sh frontend signdesk-app
 
       - name: Smoke test
         if: steps.check.outputs.ready == 'true'

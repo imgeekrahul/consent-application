@@ -216,7 +216,7 @@ vercel deploy --prod                               # env changes apply on the ne
 `.github/workflows/ci-cd.yml` runs on every pull request and on every push to `main`:
 
 1. **Build and E2E**, as a matrix over the `file` and `mongodb` storage drivers. It installs both apps, builds the frontend, starts the API (with a `mongo:7` service container for the GridFS path), and runs `npm run test:e2e`.
-2. **Deploy**, on pushes to `main` once the tests pass. For each project it runs `vercel pull`, then `vercel build --prod`, then `vercel deploy --prebuilt --prod`, and finally smoke-tests `https://signdesk-app.vercel.app`.
+2. **Deploy**, on pushes to `main` (or a manual "Run workflow" on `main`) once the tests pass. For each project it runs `vercel pull`, then `vercel build --prod`, then `vercel deploy --prebuilt --prod`, and finally smoke-tests `https://signdesk-app.vercel.app`.
 
 One-time setup: create a token at https://vercel.com/account/tokens and add it as the repository secret **`VERCEL_TOKEN`** (Settings → Secrets and variables → Actions). The Vercel org and project IDs are defaults in the workflow, and repository variables `VERCEL_ORG_ID`, `VERCEL_BACKEND_PROJECT_ID` and `VERCEL_FRONTEND_PROJECT_ID` override them. Without the token, the deploy job is skipped with a warning.
 
